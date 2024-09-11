@@ -11,23 +11,17 @@ const db = new pg.Client({
   password: "9510",
   port: 5432
 })
-db.connect((err) => {
-  if (err) {
-    console.log(err)
-  }
-  else {
-    console.log("Connected to the Database");
-  }
-});
-//DB connection end 
+
+
 
 const app = express();
 const port = 3000;
 
 app.use(bodyParser.urlencoded({ extended: true }));
 app.use(express.static("public"));
-
+db.connect();
 app.get("/", async (req, res) => {
+
   //query to get data
   const result = await db.query(
     "SELECT country_code FROM visited_countries"
@@ -45,8 +39,22 @@ app.get("/", async (req, res) => {
     total: countries.length,
     countries: countries,
   })
-  db.end();
+
 });
+
+app.post("/add", async (req, res) => {
+
+
+  const input = req.body.country;
+  console.log(input);
+  const result = await db.query("SELECT country_code FROM countries WHERE country_name=$1", [input])
+  if (result.rows.length != 0) {
+    const data = result.rows[0];
+    const countryCode = data.country_code;
+    await db.query("INSERT INTO visited_countries (country_code) VALUES ($1)", [countryCode,]);
+  }
+  res.redirect('/');
+})
 
 app.listen(port, () => {
   console.log(`Server running on http://localhost:${port}`);

@@ -20,21 +20,18 @@ const port = 3000;
 app.use(bodyParser.urlencoded({ extended: true }));
 app.use(express.static("public"));
 db.connect();
-app.get("/", async (req, res) => {
-
-  //query to get data
-  const result = await db.query(
-    "SELECT country_code FROM visited_countries"
-  )
-  const data = result.rows;
-
-  //convert result.rows into a proper array to send to ejs file
+async function checkVisisted() {
+  const result = await db.query("SELECT country_code FROM visited_countries");
   let countries = [];
-
-  data.forEach((country) => {
+  result.rows.forEach((country) => {
     countries.push(country.country_code);
   });
+  return countries;
+}
 
+app.get("/", async (req, res) => {
+
+  const countries = await checkVisisted();
   res.render("index.ejs", {
     total: countries.length,
     countries: countries,
@@ -43,17 +40,33 @@ app.get("/", async (req, res) => {
 });
 
 app.post("/add", async (req, res) => {
-
-
   const input = req.body.country;
   console.log(input);
-  const result = await db.query("SELECT country_code FROM countries WHERE country_name=$1", [input])
-  if (result.rows.length != 0) {
+  try {
+    const result = await db.query("SELECT country_code FROM countries WHERE country_name=$1", [input]);
     const data = result.rows[0];
     const countryCode = data.country_code;
-    await db.query("INSERT INTO visited_countries (country_code) VALUES ($1)", [countryCode,]);
+    try {
+      await db.query("INSERT INTO visited_countries (country_code) VALUES ($1)", [countryCode]);
+      res.redirect('/');
+    } catch (err) {
+      const countries = await checkVisisted();
+      res.render("index.ejs", {
+        countries: countries,
+        total: countries.length,
+        error: "Country already added!"
+      });
+    }
+
+
+  } catch (err) {
+    const countries = await checkVisisted();
+    res.render("index.ejs", {
+      countries: countries,
+      total: countries.length,
+      error: "Country not found!"
+    });
   }
-  res.redirect('/');
 })
 
 app.listen(port, () => {
